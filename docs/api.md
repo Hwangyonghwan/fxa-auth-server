@@ -34,6 +34,8 @@ see [`mozilla/fxa-js-client`](https://github.com/mozilla/fxa-js-client).
     * [POST /account/destroy (:lock::unlock: sessionToken)](#post-accountdestroy)
   * [Devices and sessions](#devices-and-sessions)
     * [POST /account/device (:lock: sessionToken)](#post-accountdevice)
+    * [GET /account/device/commands (:lock: sessionToken)](#get-accountdevicecommands)
+    * [POST /account/devices/invoke_command (:lock: sessionToken)](#post-accountdevicesinvoke_command)
     * [POST /account/devices/notify (:lock: sessionToken)](#post-accountdevicesnotify)
     * [GET /account/devices (:lock: sessionToken)](#get-accountdevices)
     * [GET /account/sessions (:lock: sessionToken)](#get-accountsessions)
@@ -278,6 +280,8 @@ for `code` and `errno` are:
   A TOTP token not found.
 * `code: 400, errno: 156`:
   Recovery code not found.
+* `code: 400, errno: 157`:
+  Unknown device command.
 * `code: 503, errno: 201`:
   Service unavailable
 * `code: 503, errno: 202`:
@@ -347,6 +351,7 @@ those common validations are defined here.
 * `verificationMethod`: `string, valid()`
 * `E164_NUMBER`: `/^\+[1-9]\d{1,14}$/`
 * `DIGITS`: `/^[0-9]+$/`
+* `DEVICE_COMMAND_NAME`: `/^[a-zA-Z0-9_\/\-:]{1,100}$/`
 * `IP_ADDRESS`: `string, ip`
 
 #### lib/metrics/context
@@ -382,11 +387,12 @@ those common validations are defined here.
     * `name`: isA.string.max(255).regex(DISPLAY_SAFE_UNICODE_WITH_NON_BMP)
     * `nameResponse`: isA.string.max(255)
     * `type`: isA.string.max(16)
-    * `capabilities`: isA.array.items(isA.string)
     * `pushCallback`: validators.url({ scheme: 'https' }).regex(PUSH_SERVER_REGEX).max(255).allow('')
     * `pushPublicKey`: isA.string.max(88).regex(URL_SAFE_BASE_64).allow('')
     * `pushAuthKey`: isA.string.max(24).regex(URL_SAFE_BASE_64).allow('')
     * `pushEndpointExpired`: isA.boolean.strict
+    * `availableCommands`: isA.object.pattern(validators.DEVICE_COMMAND_NAME
+    * `isA.string.max(2048))
 
   }
 
@@ -1003,12 +1009,6 @@ can be made available to other connected devices.
   
   <!--end-request-body-post-accountdevice-type-->
 
-* `capabilities`: *DEVICES_SCHEMA.capabilities.optional*
-
-  <!--begin-request-body-post-accountdevice-capabilities-->
-  
-  <!--end-request-body-post-accountdevice-capabilities-->
-
 * `pushCallback`: *DEVICES_SCHEMA.pushCallback.optional*
 
   <!--begin-request-body-post-accountdevice-pushCallback-->
@@ -1026,6 +1026,12 @@ can be made available to other connected devices.
   <!--begin-request-body-post-accountdevice-pushAuthKey-->
   
   <!--end-request-body-post-accountdevice-pushAuthKey-->
+
+* `availableCommands`: *DEVICES_SCHEMA.availableCommands.optional*
+
+  <!--begin-request-body-post-accountdevice-availableCommands-->
+  
+  <!--end-request-body-post-accountdevice-availableCommands-->
 
 ##### Response body
 
@@ -1053,12 +1059,6 @@ can be made available to other connected devices.
   
   <!--end-response-body-post-accountdevice-type-->
 
-* `capabilities`: *DEVICES_SCHEMA.capabilities.optional*
-
-  <!--begin-response-body-post-accountdevice-capabilities-->
-  
-  <!--end-response-body-post-accountdevice-capabilities-->
-
 * `pushCallback`: *DEVICES_SCHEMA.pushCallback.optional*
 
   <!--begin-response-body-post-accountdevice-pushCallback-->
@@ -1083,6 +1083,12 @@ can be made available to other connected devices.
   
   <!--end-response-body-post-accountdevice-pushEndpointExpired-->
 
+* `availableCommands`: *DEVICES_SCHEMA.availableCommands.optional*
+
+  <!--begin-response-body-post-accountdevice-availableCommands-->
+  
+  <!--end-response-body-post-accountdevice-availableCommands-->
+
 ##### Error responses
 
 Failing requests may be caused
@@ -1094,6 +1100,91 @@ by the following errors
 
 * `code: 503, errno: 202`:
   Feature not enabled
+
+
+#### GET /account/device/commands
+
+:lock: HAWK-authenticated with session token
+<!--begin-route-get-accountdevicecommands-->
+
+<!--end-route-get-accountdevicecommands-->
+
+##### Query parameters
+
+* `index`: *number, optional*
+
+  <!--begin-query-param-get-accountdevicecommands-index-->
+  
+  <!--end-query-param-get-accountdevicecommands-index-->
+
+* `limit`: *number, optional, min(0), max(100), default(100)*
+
+  <!--begin-query-param-get-accountdevicecommands-limit-->
+  
+  <!--end-query-param-get-accountdevicecommands-limit-->
+
+##### Response body
+
+* `index`: *number, required*
+
+  <!--begin-response-body-get-accountdevicecommands-index-->
+  
+  <!--end-response-body-get-accountdevicecommands-index-->
+
+* `last`: *boolean, optional*
+
+  <!--begin-response-body-get-accountdevicecommands-last-->
+  
+  <!--end-response-body-get-accountdevicecommands-last-->
+
+* `messages`: *array, items(object({ index: number, required, data: object({ command: string, max(255), required, payload: object, required, sender: DEVICES_SCHEMA.id, optional }), required })), optional*
+
+  <!--begin-response-body-get-accountdevicecommands-messages-->
+  
+  <!--end-response-body-get-accountdevicecommands-messages-->
+
+
+#### POST /account/devices/invoke_command
+
+:lock: HAWK-authenticated with session token
+<!--begin-route-post-accountdevicesinvoke_command-->
+
+<!--end-route-post-accountdevicesinvoke_command-->
+
+##### Request body
+
+* `target`: *DEVICES_SCHEMA.id.required*
+
+  <!--begin-request-body-post-accountdevicesinvoke_command-target-->
+  
+  <!--end-request-body-post-accountdevicesinvoke_command-target-->
+
+* `command`: *string, required*
+
+  <!--begin-request-body-post-accountdevicesinvoke_command-command-->
+  
+  <!--end-request-body-post-accountdevicesinvoke_command-command-->
+
+* `payload`: *object, required*
+
+  <!--begin-request-body-post-accountdevicesinvoke_command-payload-->
+  
+  <!--end-request-body-post-accountdevicesinvoke_command-payload-->
+
+* `ttl`: *number, integer, min(0), max(10000000), optional*
+
+  <!--begin-request-body-post-accountdevicesinvoke_command-ttl-->
+  
+  <!--end-request-body-post-accountdevicesinvoke_command-ttl-->
+
+##### Error responses
+
+Failing requests may be caused
+by the following errors
+(this is not an exhaustive list):
+
+* `code: 400, errno: 157`:
+  Unknown device command.
 
 
 #### POST /account/devices/notify
@@ -1226,12 +1317,6 @@ for the authenticated user.
   
   <!--end-response-body-get-accountdevices-type-->
 
-* `capabilities`: *DEVICES_SCHEMA.capabilities.optional*
-
-  <!--begin-response-body-get-accountdevices-capabilities-->
-  
-  <!--end-response-body-get-accountdevices-capabilities-->
-
 * `pushCallback`: *DEVICES_SCHEMA.pushCallback.allow(null).optional*
 
   <!--begin-response-body-get-accountdevices-pushCallback-->
@@ -1255,6 +1340,12 @@ for the authenticated user.
   <!--begin-response-body-get-accountdevices-pushEndpointExpired-->
   
   <!--end-response-body-get-accountdevices-pushEndpointExpired-->
+
+* `availableCommands`: *DEVICES_SCHEMA.availableCommands.optional*
+
+  <!--begin-response-body-get-accountdevices-availableCommands-->
+  
+  <!--end-response-body-get-accountdevices-availableCommands-->
 
 
 #### GET /account/sessions
@@ -1340,17 +1431,17 @@ for the authenticated user.
   
   <!--end-response-body-get-accountsessions-deviceName-->
 
+* `deviceAvailableCommands`: *DEVICES_SCHEMA.availableCommands.allow(null).required*
+
+  <!--begin-response-body-get-accountsessions-deviceAvailableCommands-->
+  
+  <!--end-response-body-get-accountsessions-deviceAvailableCommands-->
+
 * `deviceType`: *DEVICES_SCHEMA.type.allow(null).required*
 
   <!--begin-response-body-get-accountsessions-deviceType-->
   
   <!--end-response-body-get-accountsessions-deviceType-->
-
-* `deviceCapabilities`: *DEVICES_SCHEMA.capabilities.optional*
-
-  <!--begin-response-body-get-accountsessions-deviceCapabilities-->
-  
-  <!--end-response-body-get-accountsessions-deviceCapabilities-->
 
 * `deviceCallbackURL`: *DEVICES_SCHEMA.pushCallback.allow(null).required*
 
